@@ -6,7 +6,7 @@ spring:
   application:
     name: auth-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/incidentiq
+    url: jdbc:postgresql://localhost:5432/incidentiq_auth
     username: postgres
     password: 687898
     driver-class-name: org.postgresql.Driver

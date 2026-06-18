@@ -29,8 +29,25 @@ public class JwtUtils {
      * Generates a JWT token with username, userId, and role claims.
      */
     public String generateToken(String username, Long userId, String role) {
+        return generateToken(username, userId, role, true);
+    }
+
+    /**
+     * Generates a JWT token where the effective role (used for backend authorization)
+     * is downgraded to ROLE_USER if a manager account is not yet approved.
+     * The actual requested role and the approval flag are also embedded so the
+     * frontend can display the correct state.
+     */
+    public String generateToken(String username, Long userId, String role, boolean approved) {
+        String normalized = role == null ? "ROLE_USER" : role.trim().toUpperCase();
+        boolean isManager = normalized.equals("ROLE_MANAGER");
+        // Pending managers operate with USER-level privileges until approved.
+        String effectiveRole = (isManager && !approved) ? "ROLE_USER" : normalized;
+
         Map<String, Object> claims = new HashMap<>();
-        claims.put("role", role);
+        claims.put("role", effectiveRole);
+        claims.put("actualRole", normalized);
+        claims.put("approved", approved);
         claims.put("userId", userId);
 
         return Jwts.builder()
