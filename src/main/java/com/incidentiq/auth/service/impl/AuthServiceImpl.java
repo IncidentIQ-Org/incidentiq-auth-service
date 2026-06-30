@@ -73,8 +73,12 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String requestedRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : "ROLE_USER";
+        // Only USER and MANAGER are self-registerable; anything else (e.g. ADMIN) falls back to USER
+        if (!"ROLE_USER".equals(requestedRole) && !"ROLE_MANAGER".equals(requestedRole)) {
+            requestedRole = "ROLE_USER";
+        }
         boolean isManager = "ROLE_MANAGER".equals(requestedRole);
-        // Managers start unapproved; users and admins auto-approved
+        // Managers start unapproved; users are auto-approved
         boolean approved = !isManager;
 
         User user = User.builder()

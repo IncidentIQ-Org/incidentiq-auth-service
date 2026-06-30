@@ -64,12 +64,13 @@ public class AdminController {
     @PostMapping("/reject/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Reject user", description = "Reject and delete a pending user account")
-    public ResponseEntity<Void> rejectUser(@PathVariable Long id) {
+    public ResponseEntity<Void> rejectUser(@PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-        
+
         userRepository.delete(user);
-        deleteFromUserService(id);
+        deleteFromUserService(id, authHeader);
         return ResponseEntity.noContent().build();
     }
 
@@ -87,13 +88,14 @@ public class AdminController {
     @DeleteMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete user", description = "Permanently delete a user account from all databases")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
         // Delete from auth-service database
         userRepository.deleteById(id);
         log.info("Deleted user {} from auth-service database", id);
 
-        // Also delete from user-service database
-        deleteFromUserService(id);
+        // Also delete from user-service database — forward admin JWT so user-service accepts the call
+        deleteFromUserService(id, authHeader);
 
         return ResponseEntity.noContent().build();
     }
@@ -123,15 +125,20 @@ public class AdminController {
 
     /**
      * Cascade delete to user-service so the user is fully removed from both databases.
+     * Forwards the admin's JWT so user-service accepts the authenticated call.
      */
-    private void deleteFromUserService(Long userId) {
+    private void deleteFromUserService(Long userId, String authHeader) {
         try {
             String url = userServiceUrl + "/" + userId;
-            restTemplate.delete(url);
+            HttpHeaders headers = new HttpHeaders();
+            if (authHeader != null) {
+                headers.set("Authorization", authHeader);
+            }
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+            restTemplate.exchange(url, HttpMethod.DELETE, request, Void.class);
             log.info("Deleted user {} from user-service database", userId);
         } catch (Exception e) {
             log.error("Failed to delete user {} from user-service: {}", userId, e.getMessage());
-            // Don't fail the admin operation if user-service cleanup fails
         }
     }
 
